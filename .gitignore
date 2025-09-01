@@ -108,5 +108,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Ignored files
-art_calls.json
+.DS_Store

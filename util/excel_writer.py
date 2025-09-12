@@ -2,6 +2,8 @@ import os
 import json
 import pandas as pd
 from datetime import datetime
+from openpyxl import load_workbook
+from openpyxl.styles import Font
 
 def write_to_excel(processed_data_dir='processed_data', output_file='art_calls.xlsx'):
     """
@@ -14,19 +16,17 @@ def write_to_excel(processed_data_dir='processed_data', output_file='art_calls.x
     columns = ['reviewed', 'url', 'deadline', 'topics', 'fees', 'requirement', 'title', 'location', 'organization', 'source_file', 'added_on']
     
     existing_urls = set()
+    df_existing = pd.DataFrame(columns=columns)
     
     # Check if the output file exists and read existing URLs
     if os.path.exists(output_file):
         try:
-            df_existing = pd.read_excel(output_file)
+            df_existing = pd.read_excel(output_file, sheet_name='Sheet1')
             if 'url' in df_existing.columns:
                 existing_urls = set(df_existing['url'])
         except Exception as e:
             print(f"Error reading existing Excel file: {e}")
-            df_existing = pd.DataFrame(columns=columns)
-    else:
-        df_existing = pd.DataFrame(columns=columns)
-
+    
     new_rows = []
     
     # Iterate over each file in the processed_data directory
@@ -67,28 +67,52 @@ def write_to_excel(processed_data_dir='processed_data', output_file='art_calls.x
 
     if new_rows:
         df_new = pd.DataFrame(new_rows)
-        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
         
         # Ensure the columns are in the desired order
-        df_combined = df_combined[columns]
+        df_new = df_new[columns]
         
         # Convert deadline to date format
-        df_combined['deadline'] = pd.to_datetime(df_combined['deadline'], errors='coerce').dt.date
-        
-        with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
-            df_combined.to_excel(writer, index=False, sheet_name='Sheet1')
-            workbook = writer.book
-            worksheet = writer.sheets['Sheet1']
-            
-            url_col_idx = df_combined.columns.get_loc('url')
-            
-            url_format = workbook.add_format({'color': 'blue', 'underline': 1})
-            
-            for row_num, url in enumerate(df_combined['url']):
-                if pd.notna(url):
-                    worksheet.write_url(row_num + 1, url_col_idx, url, url_format, string=url)
+        df_new['deadline'] = pd.to_datetime(df_new['deadline'], errors='coerce').dt.date
 
-        print(f"Added {len(new_rows)} new events to {output_file}")
+        if not os.path.exists(output_file):
+            # File does not exist, create it
+            with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+                df_new.to_excel(writer, index=False, sheet_name='Sheet1')
+                workbook = writer.book
+                worksheet = writer.sheets['Sheet1']
+                
+                url_col_idx = df_new.columns.get_loc('url')
+                url_format = workbook.add_format({'color': 'blue', 'underline': 1})
+                
+                for row_num, url in enumerate(df_new['url']):
+                    if pd.notna(url):
+                        worksheet.write_url(row_num + 1, url_col_idx, url, url_format, string=url)
+            print(f"Created {output_file} and added {len(new_rows)} new events.")
+        else:
+            # File exists, append new data
+            workbook = load_workbook(output_file)
+            worksheet = workbook['Sheet1']
+            
+            # Get header and URL column index
+            header = [cell.value for cell in worksheet[1]]
+            try:
+                url_col_idx = header.index('url')
+            except ValueError:
+                print("Error: 'url' column not found in Excel file.")
+                return
+
+            for _, row in df_new.iterrows():
+                worksheet.append(row.tolist())
+                
+                # Apply hyperlink to URL
+                new_row_num = worksheet.max_row
+                url_cell = worksheet.cell(row=new_row_num, column=url_col_idx + 1)
+                if url_cell.value:
+                    url_cell.hyperlink = url_cell.value
+                    url_cell.font = Font(color="0000FF", underline='single')
+
+            workbook.save(output_file)
+            print(f"Added {len(new_rows)} new events to {output_file}")
     else:
         print("No new events to add.")
 

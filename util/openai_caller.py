@@ -7,13 +7,14 @@ from util.retry import retry_until_valid_json
 load_dotenv()
 
 api_key = os.getenv("OPENAI_API_KEY")
+MODEL="gpt-5-mini"
 
 client = OpenAI(api_key=api_key)
 
 def get_openai_response(prompt: str) -> str:
     """Gets a string response from OpenAI."""
     response = client.chat.completions.create(
-        model="gpt-4.1",
+        model=MODEL,
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
@@ -25,7 +26,7 @@ def get_openai_response(prompt: str) -> str:
 def get_openai_response_in_json(prompt: str) -> str:
     """Gets a JSON response from OpenAI, with retries."""
     response = client.chat.completions.create(
-        model="gpt-4",
+        model=MODEL,
         messages=[
             {"role": "system", "content": "You are a helpful assistant that always responds with valid JSON."},
             {"role": "user", "content": prompt}

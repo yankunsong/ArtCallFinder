@@ -5,3 +5,4 @@ webdriver-manager
 openai
 pandas
 xlsxwriter
+openpyxl

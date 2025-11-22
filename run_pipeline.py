@@ -83,6 +83,34 @@ def run_excel_export() -> None:
     write_to_excel()
 
 
+def ensure_api_key_available(required: bool) -> None:
+    """Ensure OPENAI_API_KEY is available when summarization is required."""
+    if not required:
+        return
+
+    # Attempt to load environment variables from .env if python-dotenv is available
+    try:
+        from dotenv import load_dotenv  # type: ignore
+    except Exception:
+        load_dotenv = None  # type: ignore[assignment]
+    if load_dotenv:
+        try:
+            load_dotenv()
+        except Exception:
+            pass
+
+    import os
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        logging.error(
+            "OPENAI_API_KEY is not set. Create a .env file at the project root "
+            "with OPENAI_API_KEY=... or export it in your shell. "
+            "Use --skip-summarize to run the pipeline without OpenAI."
+        )
+        raise SystemExit(1)
+
+
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     """Parse orchestrator command-line arguments."""
     parser = argparse.ArgumentParser(description="Run the ArtCallFinder data pipeline end-to-end.")
@@ -97,6 +125,9 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     configure_logging(args.verbose)
+
+    # Preflight: ensure API key is present if summarization is enabled
+    ensure_api_key_available(required=not args.skip_summarize)
 
     try:
         if not args.skip_scrape:
